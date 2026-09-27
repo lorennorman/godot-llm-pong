@@ -2,6 +2,8 @@ class_name PongCourt
 extends Node2D
 
 signal point_scored(player: int)
+signal paddle_hit(intensity: float)
+signal served
 
 @export var bounds := Rect2(24, 125, 952, 465)
 
@@ -20,6 +22,8 @@ func _ready() -> void:
 		Vector2(bounds.end.x - 41 - player_two.size.x, center.y - player_two.size.y / 2))
 	ball.configure(bounds, [player_one, player_two])
 	ball.goal_scored.connect(_on_goal_scored)
+	ball.paddle_hit.connect(paddle_hit.emit)
+	ball.served.connect(served.emit)
 
 
 func _on_goal_scored(player: int) -> void:
@@ -30,6 +34,16 @@ func prepare_serve(direction: float) -> void:
 	player_one.reset()
 	player_two.reset()
 	ball.prepare_serve(direction)
+
+
+func boost_paddle(player: int) -> void:
+	var paddle := player_one if player == 0 else player_two
+	paddle.boost()
+
+
+func reset_paddle_upgrades() -> void:
+	player_one.reset_upgrades()
+	player_two.reset_upgrades()
 
 
 func is_serving() -> bool:

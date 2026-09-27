@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/sound_effects.gd" id="1"]
+
+[node name="SoundEffects" type="Node"]
+script = ExtResource("1")
+
+[node name="Cue" type="AudioStreamPlayer" parent="."]
+volume_db = -9.0
+
+[node name="Hit" type="AudioStreamPlayer" parent="."]
+volume_db = -8.0
+max_polyphony = 4

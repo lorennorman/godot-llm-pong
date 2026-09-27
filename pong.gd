@@ -8,6 +8,8 @@ const BLUE := Color("66d9ff")
 const PINK := Color("ff83b5")
 
 @onready var court: PongCourt = $Court
+@onready var shake_camera = $ShakeCamera
+@onready var sound_effects = $SoundEffects
 
 var scores: Array[int] = [0, 0]
 var paused := false
@@ -17,6 +19,9 @@ var font: Font = ThemeDB.fallback_font
 
 func _ready() -> void:
 	court.point_scored.connect(award_point)
+	court.paddle_hit.connect(shake_camera.shake)
+	court.paddle_hit.connect(sound_effects.play_hit)
+	court.served.connect(sound_effects.play_serve)
 	reset_match()
 
 
@@ -24,6 +29,10 @@ func reset_match() -> void:
 	scores = [0, 0]
 	winner = -1
 	paused = false
+	sound_effects.stop_all()
+	sound_effects.set_paused(false)
+	shake_camera.clear()
+	court.reset_paddle_upgrades()
 	prepare_serve(1.0 if randf() > 0.5 else -1.0)
 
 
@@ -38,11 +47,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			reset_match()
 		elif event.physical_keycode == KEY_SPACE and winner < 0:
 			paused = not paused
+			sound_effects.set_paused(paused)
 		queue_redraw()
 
 
 func _physics_process(delta: float) -> void:
-	if paused or winner >= 0:
+	if paused:
+		return
+	shake_camera.step(delta)
+	if winner >= 0:
 		return
 	court.step(delta)
 	queue_redraw()
@@ -50,9 +63,11 @@ func _physics_process(delta: float) -> void:
 
 func award_point(player: int) -> void:
 	scores[player] += 1
+	court.boost_paddle(1 - player)
 	if scores[player] >= WIN_SCORE:
 		winner = player
 		court.stop()
+		sound_effects.play_win()
 	else:
 		prepare_serve(-1.0 if player == 1 else 1.0)
 
@@ -69,7 +84,7 @@ func _draw() -> void:
 	centered_text(str(scores[0]), 425, 100, 46, BLUE)
 	centered_text(str(scores[1]), 575, 100, 46, PINK)
 	centered_text("FIRST TO %d" % WIN_SCORE, 500, 120, 12, MUTED)
-	centered_text("Move within your half  |  SPACE pause  |  R restart", 500, 625, 17, MUTED)
+	centered_text("Move within your half  |  SPACE pause  |  R restart  |  M music", 500, 625, 17, MUTED)
 	var message := ""
 	if winner >= 0:
 		message = "PLAYER %d WINS!  /  R TO PLAY AGAIN" % (winner + 1)
