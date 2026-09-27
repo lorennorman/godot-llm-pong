@@ -1,0 +1,83 @@
+name: Build and deploy web game
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot and web export template
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="${GODOT_VERSION}-stable"
+          base_url="https://github.com/godotengine/godot-builds/releases/download/${release}"
+          editor="Godot_v${release}_linux.x86_64.zip"
+          templates="Godot_v${release}_export_templates.tpz"
+          install_dir="${RUNNER_TEMP}/godot"
+          template_dir="${HOME}/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$install_dir" "$template_dir"
+          cd "$install_dir"
+          curl -fsSL --retry 3 "${base_url}/${editor}" -o "$editor"
+          curl -fsSL --retry 3 "${base_url}/${templates}" -o "$templates"
+          curl -fsSL --retry 3 "${base_url}/SHA512-SUMS.txt" -o SHA512-SUMS.txt
+          grep -F " $editor" SHA512-SUMS.txt > selected-checksums.txt
+          grep -F " $templates" SHA512-SUMS.txt >> selected-checksums.txt
+          sha512sum --check selected-checksums.txt
+          unzip -q "$editor"
+          mv "Godot_v${release}_linux.x86_64" godot
+          chmod +x godot
+          unzip -j -q "$templates" 'templates/web_nothreads_release.zip' -d "$template_dir"
+          echo "$install_dir" >> "$GITHUB_PATH"
+
+      - name: Import project
+        run: godot --headless --path . --editor --import
+
+      - name: Export web game
+        run: |
+          mkdir -p build/web
+          godot --headless --path . --export-release Web build/web/index.html
+          test -s build/web/index.html
+          test -s build/web/index.js
+          test -s build/web/index.wasm
+          test -s build/web/index.pck
+          touch build/web/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/web
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
