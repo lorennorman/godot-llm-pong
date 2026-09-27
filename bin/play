@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if command -v godot >/dev/null 2>&1; then
+    engine=godot
+elif command -v godot4 >/dev/null 2>&1; then
+    engine=godot4
+else
+    echo "Godot 4 is required. Install it and add godot or godot4 to PATH." >&2
+    exit 127
+fi
+
+exec "$engine" --path "$project_dir" "$@"
